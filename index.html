@@ -1,10 +1,11 @@
+```html
 <!DOCTYPE html>
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Finder Titik Terdekat - KML / KMZ</title>
+<title>Finder Titik Terdekat - KIB</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -73,8 +74,7 @@ label {
   margin-bottom: 5px;
 }
 
-input[type="text"],
-input[type="file"] {
+input[type="text"] {
   width: 100%;
   padding: 10px;
   border: 1px solid #ced4da;
@@ -295,10 +295,6 @@ button:disabled {
   line-height: 1.5;
 }
 
-.manual-result {
-  margin-top: 10px;
-}
-
 .table-wrap {
   overflow-x: auto;
 }
@@ -422,7 +418,7 @@ tr.nearest-row {
     <h1>📍 Finder Titik Terdekat</h1>
 
     <div class="small">
-      Cari kantor terdekat dari lokasi Customer menggunakan KML / KMZ.
+      Cari kantor terdekat dari lokasi Customer menggunakan data KML / KMZ KIB.
     </div>
 
   </div>
@@ -578,23 +574,17 @@ tr.nearest-row {
   </div>
 
 
-  <!-- KML / KMZ -->
+  <!-- DATA KMZ OTOMATIS -->
 
   <div class="card">
 
-    <h2>2. Upload KML / KMZ Kantor</h2>
-
-    <input
-      type="file"
-      id="fileInput"
-      accept=".kml,.kmz"
-    >
+    <h2>2. Data Titik Kantor</h2>
 
     <div
       id="fileStatus"
       class="status"
     >
-      Belum ada file.
+      ⏳ Memuat data titik kantor...
     </div>
 
   </div>
@@ -713,7 +703,16 @@ let currentLocation = null;
 
 let lastAdminAddress = '';
 
-const $ = id => document.getElementById(id);
+const $ = id =>
+  document.getElementById(id);
+
+
+/* =========================================================
+   NAMA FILE KMZ DI GITHUB
+========================================================= */
+
+const KMZ_FILE =
+  "./KANTOR PT KIB 240826.kmz";
 
 
 /* =========================================================
@@ -724,32 +723,49 @@ function setMode(newMode) {
 
   mode = newMode;
 
-  const customerMode = $('customerMode');
-  const adminMode = $('adminMode');
+  const customerMode =
+    $('customerMode');
 
-  const customerPanel = $('customerPanel');
-  const adminPanel = $('adminPanel');
+  const adminMode =
+    $('adminMode');
+
+  const customerPanel =
+    $('customerPanel');
+
+  const adminPanel =
+    $('adminPanel');
+
 
   if (mode === 'customer') {
 
     customerMode.classList.add('active');
+
     adminMode.classList.remove('active');
 
     customerPanel.classList.remove('hidden');
+
     adminPanel.classList.add('hidden');
 
   } else {
 
     adminMode.classList.add('active');
+
     customerMode.classList.remove('active');
 
     customerPanel.classList.add('hidden');
+
     adminPanel.classList.remove('hidden');
 
   }
 
-  if (currentLocation && points.length) {
+
+  if (
+    currentLocation &&
+    points.length
+  ) {
+
     findNearest();
+
   }
 
 }
@@ -762,130 +778,160 @@ function setMode(newMode) {
 function handleAddressKey(event) {
 
   if (event.key === 'Enter') {
+
     event.preventDefault();
+
     searchAdminLocation();
+
   }
 
 }
 
 
 /* =========================================================
-   FILE INPUT
+   AUTO LOAD KMZ DARI GITHUB
 ========================================================= */
 
-$('fileInput').addEventListener('change', async function () {
-
-  const file = this.files[0];
-
-  if (!file) {
-    return;
-  }
+async function loadKMZAutomatically() {
 
   try {
 
-    $('fileStatus').className = 'status';
+    $('fileStatus').className =
+      'status';
 
     $('fileStatus').textContent =
-      '⏳ Membaca file...';
-
-    let kmlText = '';
-
-    const fileName =
-      file.name.toLowerCase();
+      '⏳ Memuat data titik kantor dari KMZ...';
 
 
-    /* =====================================================
-       KML
-    ====================================================== */
+    /*
+      Ambil file KMZ dari repository
+    */
 
-    if (fileName.endsWith('.kml')) {
-
-      kmlText = await file.text();
-
-    }
-
-
-    /* =====================================================
-       KMZ
-    ====================================================== */
-
-    else if (fileName.endsWith('.kmz')) {
-
-      const zip =
-        await JSZip.loadAsync(
-          await file.arrayBuffer()
-        );
-
-      let kmlFile =
-        zip.file('doc.kml');
+    const response =
+      await fetch(KMZ_FILE, {
+        cache: 'no-store'
+      });
 
 
-      if (!kmlFile) {
-
-        const allKml =
-          Object.keys(zip.files)
-            .filter(name =>
-              name.toLowerCase().endsWith('.kml')
-            );
-
-        if (allKml.length > 0) {
-          kmlFile = zip.file(allKml[0]);
-        }
-
-      }
-
-
-      if (!kmlFile) {
-
-        throw new Error(
-          'File KMZ tidak berisi KML.'
-        );
-
-      }
-
-
-      kmlText =
-        await kmlFile.async('text');
-
-    }
-
-
-    else {
+    if (!response.ok) {
 
       throw new Error(
-        'Format file harus KML atau KMZ.'
+        `File KMZ tidak ditemukan (${response.status}).`
       );
 
     }
 
 
-    /* =====================================================
-       PARSE
-    ====================================================== */
+    /*
+      Baca sebagai ArrayBuffer
+    */
 
-    points = parseKML(kmlText);
+    const arrayBuffer =
+      await response.arrayBuffer();
+
+
+    /*
+      Buka KMZ dengan JSZip
+    */
+
+    const zip =
+      await JSZip.loadAsync(
+        arrayBuffer
+      );
+
+
+    /*
+      Cari doc.kml
+    */
+
+    let kmlFile =
+      zip.file('doc.kml');
+
+
+    /*
+      Jika doc.kml tidak ada,
+      cari file KML lainnya
+    */
+
+    if (!kmlFile) {
+
+      const allKml =
+        Object.keys(zip.files)
+          .filter(name =>
+            name
+              .toLowerCase()
+              .endsWith('.kml')
+          );
+
+
+      if (allKml.length > 0) {
+
+        kmlFile =
+          zip.file(allKml[0]);
+
+      }
+
+    }
+
+
+    if (!kmlFile) {
+
+      throw new Error(
+        'File KMZ tidak berisi file KML.'
+      );
+
+    }
+
+
+    /*
+      Baca isi KML
+    */
+
+    const kmlText =
+      await kmlFile.async('text');
+
+
+    /*
+      Parse KML
+    */
+
+    points =
+      parseKML(kmlText);
 
 
     if (!points.length) {
 
       throw new Error(
-        'Tidak ditemukan titik Placemark pada file.'
+        'Tidak ditemukan titik Placemark pada KMZ.'
       );
 
     }
 
 
+    /*
+      Status berhasil
+    */
+
     $('fileStatus').className =
       'status success';
 
     $('fileStatus').textContent =
-      `✅ ${file.name} berhasil dibaca. ${points.length} titik ditemukan.`;
+      `✅ Data kantor berhasil dimuat. ${points.length} titik ditemukan.`;
 
+
+    /*
+      Tampilkan daftar titik
+    */
 
     $('pointsCard')
       .classList
       .remove('hidden');
 
+
+    /*
+      Jika lokasi Customer sudah ada,
+      langsung hitung titik terdekat.
+    */
 
     if (currentLocation) {
 
@@ -900,17 +946,27 @@ $('fileInput').addEventListener('change', async function () {
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      'Gagal memuat KMZ:',
+      error
+    );
+
 
     $('fileStatus').className =
       'status error';
 
-    $('fileStatus').textContent =
-      '❌ ' + error.message;
+
+    $('fileStatus').innerHTML =
+      `
+        ❌ Gagal memuat data KMZ.<br>
+        <span class="small">
+          ${escapeHtml(error.message)}
+        </span>
+      `;
 
   }
 
-});
+}
 
 
 /* =========================================================
@@ -931,6 +987,7 @@ function parseKML(text) {
 
   const parserError =
     xml.getElementsByTagName('parsererror');
+
 
   if (parserError.length) {
 
@@ -953,77 +1010,84 @@ function parseKML(text) {
   const result = [];
 
 
-  placemarks.forEach((placemark) => {
+  placemarks.forEach(
+    placemark => {
 
-    const name =
-      cleanText(
-        getFirstText(
-          placemark,
-          'name'
-        )
-      ) || 'Tanpa Nama';
-
-
-    const description =
-      cleanText(
-        getFirstText(
-          placemark,
-          'description'
-        )
-      );
+      const name =
+        cleanText(
+          getFirstText(
+            placemark,
+            'name'
+          )
+        ) || 'Tanpa Nama';
 
 
-    let coordinates =
-      getFirstText(
-        placemark,
-        'coordinates'
-      );
-
-
-    /* fallback gx:coord */
-
-    if (!coordinates) {
-
-      coordinates =
-        getFirstText(
-          placemark,
-          'coord'
+      const description =
+        cleanText(
+          getFirstText(
+            placemark,
+            'description'
+          )
         );
 
+
+      let coordinates =
+        getFirstText(
+          placemark,
+          'coordinates'
+        );
+
+
+      /*
+        fallback gx:coord
+      */
+
+      if (!coordinates) {
+
+        coordinates =
+          getFirstText(
+            placemark,
+            'coord'
+          );
+
+      }
+
+
+      if (!coordinates) {
+        return;
+      }
+
+
+      const coordinate =
+        parseCoordinateString(
+          coordinates
+        );
+
+
+      if (!coordinate) {
+        return;
+      }
+
+
+      result.push({
+
+        name,
+
+        description,
+
+        lat:
+          coordinate.lat,
+
+        lon:
+          coordinate.lon,
+
+        distance:
+          null
+
+      });
+
     }
-
-
-    if (!coordinates) {
-      return;
-    }
-
-
-    const coordinate =
-      parseCoordinateString(
-        coordinates
-      );
-
-
-    if (!coordinate) {
-      return;
-    }
-
-
-    result.push({
-
-      name,
-
-      description,
-
-      lat: coordinate.lat,
-
-      lon: coordinate.lon,
-
-      distance: null
-
-    });
-
-  });
+  );
 
 
   return result;
@@ -1054,7 +1118,9 @@ function getFirstText(
     elements[0].textContent
   ) {
 
-    return elements[0].textContent.trim();
+    return elements[0]
+      .textContent
+      .trim();
 
   }
 
@@ -1079,7 +1145,8 @@ function cleanText(text) {
     document.createElement('div');
 
 
-  temp.innerHTML = text;
+  temp.innerHTML =
+    text;
 
 
   return (
@@ -1108,10 +1175,11 @@ function parseCoordinateString(value) {
       .replace(/\s+/g, ' ');
 
 
-  /* =====================================================
-     KML:
-     longitude,latitude,altitude
-  ====================================================== */
+  /*
+    Format KML:
+
+    longitude,latitude,altitude
+  */
 
   const first =
     value.split(/\s+/)[0];
@@ -1132,30 +1200,26 @@ function parseCoordinateString(value) {
 
     if (
       Number.isFinite(lat) &&
-      Number.isFinite(lon)
+      Number.isFinite(lon) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lon) <= 180
     ) {
 
-      if (
-        Math.abs(lat) <= 90 &&
-        Math.abs(lon) <= 180
-      ) {
-
-        return {
-          lat,
-          lon
-        };
-
-      }
+      return {
+        lat,
+        lon
+      };
 
     }
 
   }
 
 
-  /* =====================================================
-     gx:coord:
-     longitude latitude altitude
-  ====================================================== */
+  /*
+    Format gx:coord:
+
+    longitude latitude altitude
+  */
 
   const gx =
     value.split(/\s+/);
@@ -1172,20 +1236,15 @@ function parseCoordinateString(value) {
 
     if (
       Number.isFinite(lat) &&
-      Number.isFinite(lon)
+      Number.isFinite(lon) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lon) <= 180
     ) {
 
-      if (
-        Math.abs(lat) <= 90 &&
-        Math.abs(lon) <= 180
-      ) {
-
-        return {
-          lat,
-          lon
-        };
-
-      }
+      return {
+        lat,
+        lon
+      };
 
     }
 
@@ -1251,7 +1310,9 @@ function getGPS() {
 
 
       if (points.length) {
+
         findNearest();
+
       }
 
     },
@@ -1271,18 +1332,24 @@ function getGPS() {
 
 
       if (error.code === 1) {
+
         message =
           'Izin lokasi ditolak. Aktifkan GPS/location permission.';
+
       }
 
       else if (error.code === 2) {
+
         message =
           'Lokasi tidak tersedia.';
+
       }
 
       else if (error.code === 3) {
+
         message =
           'GPS timeout. Coba lagi.';
+
       }
 
 
@@ -1328,7 +1395,8 @@ async function searchAdminLocation() {
   }
 
 
-  lastAdminAddress = address;
+  lastAdminAddress =
+    address;
 
 
   $('adminStatus').className =
@@ -1355,13 +1423,15 @@ async function searchAdminLocation() {
 
 
     const response =
-      await fetch(url, {
-
-        headers: {
-          'Accept': 'application/json'
+      await fetch(
+        url,
+        {
+          headers: {
+            'Accept':
+              'application/json'
+          }
         }
-
-      });
+      );
 
 
     if (!response.ok) {
@@ -1408,13 +1478,17 @@ async function searchAdminLocation() {
         ${currentLocation.lon.toFixed(6)}
         <br>
         <span class="small">
-          ${escapeHtml(data[0].display_name || '')}
+          ${escapeHtml(
+            data[0].display_name || ''
+          )}
         </span>
       `;
 
 
     if (points.length) {
+
       findNearest();
+
     }
 
 
@@ -1422,11 +1496,6 @@ async function searchAdminLocation() {
 
     console.error(error);
 
-
-    /*
-      Kalau OSM error / gagal, tetap kasih
-      pilihan Google Maps sebagai fallback.
-    */
 
     showGoogleFallback(
       '⚠️ OpenStreetMap tidak dapat memberikan hasil. Silakan coba Google Maps.'
@@ -1517,7 +1586,9 @@ $('manualCoordinate')
 
 
       const coordinate =
-        parseManualCoordinate(value);
+        parseManualCoordinate(
+          value
+        );
 
 
       if (!coordinate) {
@@ -1533,11 +1604,8 @@ $('manualCoordinate')
       }
 
 
-      /*
-        LANGSUNG GUNAKAN KOORDINAT
-      */
-
-      currentLocation = coordinate;
+      currentLocation =
+        coordinate;
 
 
       $('coordinateStatus').className =
@@ -1564,12 +1632,10 @@ $('manualCoordinate')
         `;
 
 
-      /*
-        LANGSUNG CARI TITIK TERDEKAT
-      */
-
       if (points.length) {
+
         findNearest();
+
       }
 
     }
@@ -1587,20 +1653,14 @@ function parseManualCoordinate(value) {
   }
 
 
-  /*
-    Normalisasi koma desimal Indonesia.
-
-    Tetapi jangan mengubah koma pemisah
-    Latitude dan Longitude.
-  */
-
   let text =
     value.trim();
 
 
   /*
-    1. Coba format:
-       -7.246897, 112.731227
+    Format:
+
+    -7.246897, 112.731227
   */
 
   let match =
@@ -1619,7 +1679,10 @@ function parseManualCoordinate(value) {
 
 
     if (
-      validLatLon(lat, lon)
+      validLatLon(
+        lat,
+        lon
+      )
     ) {
 
       return {
@@ -1633,8 +1696,9 @@ function parseManualCoordinate(value) {
 
 
   /*
-    2. Coba format:
-       -7.246897 112.731227
+    Format:
+
+    -7.246897 112.731227
   */
 
   match =
@@ -1653,7 +1717,10 @@ function parseManualCoordinate(value) {
 
 
     if (
-      validLatLon(lat, lon)
+      validLatLon(
+        lat,
+        lon
+      )
     ) {
 
       return {
@@ -1667,10 +1734,7 @@ function parseManualCoordinate(value) {
 
 
   /*
-    3. Cari dua angka dari teks/link Google Maps
-
-    Contoh:
-    https://maps.google.com/?q=-7.246897,112.731227
+    Google Maps URL / teks lainnya
   */
 
   const numbers =
@@ -1679,12 +1743,10 @@ function parseManualCoordinate(value) {
     );
 
 
-  if (numbers && numbers.length >= 2) {
-
-    /*
-      Cari pasangan angka yang masuk
-      range latitude / longitude.
-    */
+  if (
+    numbers &&
+    numbers.length >= 2
+  ) {
 
     for (
       let i = 0;
@@ -1724,7 +1786,10 @@ function parseManualCoordinate(value) {
    VALIDATE LAT LON
 ========================================================= */
 
-function validLatLon(lat, lon) {
+function validLatLon(
+  lat,
+  lon
+) {
 
   return (
     Number.isFinite(lat) &&
@@ -1746,21 +1811,25 @@ function findNearest() {
     !currentLocation ||
     !points.length
   ) {
+
     return;
+
   }
 
 
-  points.forEach(point => {
+  points.forEach(
+    point => {
 
-    point.distance =
-      haversine(
-        currentLocation.lat,
-        currentLocation.lon,
-        point.lat,
-        point.lon
-      );
+      point.distance =
+        haversine(
+          currentLocation.lat,
+          currentLocation.lon,
+          point.lat,
+          point.lon
+        );
 
-  });
+    }
+  );
 
 
   points.sort(
@@ -1772,10 +1841,6 @@ function findNearest() {
   const nearest =
     points[0];
 
-
-  /* =====================================================
-     HASIL TITIK TERDEKAT
-  ====================================================== */
 
   $('nearestCard')
     .classList
@@ -1791,7 +1856,11 @@ function findNearest() {
       </span>
 
       <div class="nearest-title">
-        <b>${escapeHtml(nearest.name)}</b>
+        <b>
+          ${escapeHtml(
+            nearest.name
+          )}
+        </b>
       </div>
 
       <div class="nearest-coord">
@@ -1800,14 +1869,20 @@ function findNearest() {
       </div>
 
       <div class="nearest-distance">
-        📏 <b>${formatDistance(nearest.distance)}</b>
+        📏 <b>
+          ${formatDistance(
+            nearest.distance
+          )}
+        </b>
       </div>
 
       ${
         nearest.description
           ? `
             <div class="nearest-description">
-              ${escapeHtml(nearest.description)}
+              ${escapeHtml(
+                nearest.description
+              )}
             </div>
           `
           : ''
@@ -1818,7 +1893,9 @@ function findNearest() {
         <b>ASAL</b>
 
         <div class="route-value">
-          ${escapeHtml(nearest.name)}
+          ${escapeHtml(
+            nearest.name
+          )}
         </div>
 
         <b>TUJUAN</b>
@@ -1881,7 +1958,8 @@ function renderPoints() {
     $('pointsTable');
 
 
-  tbody.innerHTML = '';
+  tbody.innerHTML =
+    '';
 
 
   points.forEach(
@@ -1934,14 +2012,18 @@ function renderPoints() {
         <td>
 
           <b>
-            ${escapeHtml(point.name)}
+            ${escapeHtml(
+              point.name
+            )}
           </b>
 
           ${
             point.description
               ? `
                 <div class="small mt10">
-                  ${escapeHtml(point.description)}
+                  ${escapeHtml(
+                    point.description
+                  )}
                 </div>
               `
               : ''
@@ -1958,7 +2040,9 @@ function renderPoints() {
 
           ${
             point.distance !== null
-              ? formatDistance(point.distance)
+              ? formatDistance(
+                  point.distance
+                )
               : '-'
           }
 
@@ -1983,7 +2067,6 @@ function renderPoints() {
       tbody.appendChild(tr);
 
     }
-
   );
 
 }
@@ -2000,23 +2083,38 @@ function haversine(
   lon2
 ) {
 
-  const R = 6371;
+  const R =
+    6371;
 
 
   const dLat =
-    toRad(lat2 - lat1);
+    toRad(
+      lat2 - lat1
+    );
 
 
   const dLon =
-    toRad(lon2 - lon1);
+    toRad(
+      lon2 - lon1
+    );
 
 
   const a =
-    Math.sin(dLat / 2) ** 2 +
+    Math.sin(
+      dLat / 2
+    ) ** 2 +
 
-    Math.cos(toRad(lat1)) *
-    Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) ** 2;
+    Math.cos(
+      toRad(lat1)
+    ) *
+
+    Math.cos(
+      toRad(lat2)
+    ) *
+
+    Math.sin(
+      dLon / 2
+    ) ** 2;
 
 
   const c =
@@ -2038,9 +2136,11 @@ function haversine(
 
 function toRad(value) {
 
-  return value *
+  return (
+    value *
     Math.PI /
-    180;
+    180
+  );
 
 }
 
@@ -2051,15 +2151,21 @@ function toRad(value) {
 
 function formatDistance(km) {
 
-  if (!Number.isFinite(km)) {
+  if (
+    !Number.isFinite(km)
+  ) {
+
     return '-';
+
   }
 
 
   if (km < 1) {
 
     return (
-      Math.round(km * 1000) +
+      Math.round(
+        km * 1000
+      ) +
       ' m'
     );
 
@@ -2100,9 +2206,13 @@ function mapsUrl(
   return (
     'https://www.google.com/maps/dir/?api=1' +
     '&origin=' +
-    encodeURIComponent(origin) +
+    encodeURIComponent(
+      origin
+    ) +
     '&destination=' +
-    encodeURIComponent(destination) +
+    encodeURIComponent(
+      destination
+    ) +
     '&travelmode=driving'
   );
 
@@ -2122,7 +2232,9 @@ function mapsPointUrl(
     'https://www.google.com/maps/search/?api=1' +
     '&query=' +
     encodeURIComponent(
-      lat + ',' + lon
+      lat +
+      ',' +
+      lon
     )
   );
 
@@ -2179,12 +2291,19 @@ function escapeHtml(value) {
    TEST KOORDINAT
 ========================================================= */
 
-function testCoordinate(value) {
+function testCoordinate(
+  value
+) {
 
-  setMode('admin');
+  setMode(
+    'admin'
+  );
 
-  $('manualCoordinate').value =
+
+  $('manualCoordinate')
+    .value =
     value;
+
 
   $('manualCoordinate')
     .dispatchEvent(
@@ -2193,7 +2312,15 @@ function testCoordinate(value) {
 
 }
 
+
+/* =========================================================
+   MULAI AUTO LOAD KMZ
+========================================================= */
+
+loadKMZAutomatically();
+
 </script>
 
 </body>
 </html>
+```
