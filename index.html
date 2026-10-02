@@ -223,10 +223,10 @@ button:disabled {
 
 .route-info {
   display: grid;
-  grid-template-columns: 55px 1fr;
-  gap: 3px 8px;
+  grid-template-columns: 125px 1fr;
+  gap: 5px 8px;
   margin-top: 9px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1px solid #dfe5e9;
   border-radius: 8px;
   background: #ffffff;
@@ -240,6 +240,20 @@ button:disabled {
 .route-value {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.route-loading {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.route-success {
+  color: #198754;
+  font-weight: bold;
+}
+
+.route-warning {
+  color: #856404;
 }
 
 .nearest-navigation {
@@ -394,7 +408,7 @@ tr.nearest-row {
   }
 
   .route-info {
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 110px 1fr;
     font-size: 11px;
   }
 
@@ -411,7 +425,6 @@ tr.nearest-row {
 <div class="container">
 
   <!-- HEADER -->
-
   <div class="card">
 
     <h1>📍 Finder Titik Terdekat</h1>
@@ -424,7 +437,6 @@ tr.nearest-row {
 
 
   <!-- MODE -->
-
   <div class="card">
 
     <h2>1. Pilih Mode</h2>
@@ -451,7 +463,6 @@ tr.nearest-row {
 
 
     <!-- CUSTOMER -->
-
     <div id="customerPanel">
 
       <button
@@ -472,7 +483,6 @@ tr.nearest-row {
 
 
     <!-- ADMIN -->
-
     <div
       id="adminPanel"
       class="hidden"
@@ -505,7 +515,6 @@ tr.nearest-row {
 
 
       <!-- GOOGLE FALLBACK -->
-
       <div
         id="googleFallback"
         class="hidden"
@@ -514,6 +523,7 @@ tr.nearest-row {
         <div class="help-box">
 
           <b>⚠️ Alamat tidak ditemukan di OpenStreetMap.</b>
+
           <br><br>
 
           Coba cari alamat tersebut di Google Maps.
@@ -574,7 +584,6 @@ tr.nearest-row {
 
 
   <!-- DATA KMZ OTOMATIS -->
-
   <div class="card">
 
     <h2>2. Data Titik Kantor</h2>
@@ -590,7 +599,6 @@ tr.nearest-row {
 
 
   <!-- HASIL TITIK TERDEKAT -->
-
   <div
     id="nearestCard"
     class="card hidden"
@@ -604,7 +612,6 @@ tr.nearest-row {
 
 
   <!-- DAFTAR TITIK -->
-
   <div
     id="pointsCard"
     class="card hidden"
@@ -643,7 +650,6 @@ tr.nearest-row {
 
 
   <!-- TEST AREA -->
-
   <div class="card">
 
     <h2>🧪 Area Uji Coba</h2>
@@ -695,15 +701,11 @@ tr.nearest-row {
 ========================================================= */
 
 let mode = 'customer';
-
 let points = [];
-
 let currentLocation = null;
-
 let lastAdminAddress = '';
 
-const $ = id =>
-  document.getElementById(id);
+const $ = id => document.getElementById(id);
 
 
 /* =========================================================
@@ -712,6 +714,15 @@ const $ = id =>
 
 const KMZ_FILE =
   "./KANTOR PT KIB 240826.kmz";
+
+
+/* =========================================================
+   OSRM ROUTING
+   TANPA API KEY / TANPA GOOGLE API BERBAYAR
+========================================================= */
+
+const OSRM_URL =
+  "https://router.project-osrm.org/route/v1/driving";
 
 
 /* =========================================================
@@ -738,21 +749,17 @@ function setMode(newMode) {
   if (mode === 'customer') {
 
     customerMode.classList.add('active');
-
     adminMode.classList.remove('active');
 
     customerPanel.classList.remove('hidden');
-
     adminPanel.classList.add('hidden');
 
   } else {
 
     adminMode.classList.add('active');
-
     customerMode.classList.remove('active');
 
     customerPanel.classList.add('hidden');
-
     adminPanel.classList.remove('hidden');
 
   }
@@ -802,14 +809,13 @@ async function loadKMZAutomatically() {
       '⏳ Memuat data titik kantor dari KMZ...';
 
 
-    /*
-      Ambil file KMZ dari repository
-    */
-
     const response =
-      await fetch(KMZ_FILE, {
-        cache: 'no-store'
-      });
+      await fetch(
+        KMZ_FILE,
+        {
+          cache: 'no-store'
+        }
+      );
 
 
     if (!response.ok) {
@@ -821,17 +827,9 @@ async function loadKMZAutomatically() {
     }
 
 
-    /*
-      Baca sebagai ArrayBuffer
-    */
-
     const arrayBuffer =
       await response.arrayBuffer();
 
-
-    /*
-      Buka KMZ dengan JSZip
-    */
 
     const zip =
       await JSZip.loadAsync(
@@ -839,18 +837,9 @@ async function loadKMZAutomatically() {
       );
 
 
-    /*
-      Cari doc.kml
-    */
-
     let kmlFile =
       zip.file('doc.kml');
 
-
-    /*
-      Jika doc.kml tidak ada,
-      cari file KML lainnya
-    */
 
     if (!kmlFile) {
 
@@ -882,17 +871,9 @@ async function loadKMZAutomatically() {
     }
 
 
-    /*
-      Baca isi KML
-    */
-
     const kmlText =
       await kmlFile.async('text');
 
-
-    /*
-      Parse KML
-    */
 
     points =
       parseKML(kmlText);
@@ -907,10 +888,6 @@ async function loadKMZAutomatically() {
     }
 
 
-    /*
-      Status berhasil
-    */
-
     $('fileStatus').className =
       'status success';
 
@@ -918,19 +895,10 @@ async function loadKMZAutomatically() {
       `✅ Data kantor berhasil dimuat. ${points.length} titik ditemukan.`;
 
 
-    /*
-      Tampilkan daftar titik
-    */
-
     $('pointsCard')
       .classList
       .remove('hidden');
 
-
-    /*
-      Jika lokasi Customer sudah ada,
-      langsung hitung titik terdekat.
-    */
 
     if (currentLocation) {
 
@@ -941,7 +909,6 @@ async function loadKMZAutomatically() {
       renderPoints();
 
     }
-
 
   } catch (error) {
 
@@ -958,6 +925,7 @@ async function loadKMZAutomatically() {
     $('fileStatus').innerHTML =
       `
         ❌ Gagal memuat data KMZ.<br>
+
         <span class="small">
           ${escapeHtml(error.message)}
         </span>
@@ -976,6 +944,7 @@ function parseKML(text) {
 
   const parser =
     new DOMParser();
+
 
   const xml =
     parser.parseFromString(
@@ -1037,10 +1006,6 @@ function parseKML(text) {
         );
 
 
-      /*
-        fallback gx:coord
-      */
-
       if (!coordinates) {
 
         coordinates =
@@ -1081,7 +1046,16 @@ function parseKML(text) {
           coordinate.lon,
 
         distance:
-          null
+          null,
+
+        routeDistance:
+          null,
+
+        routeDuration:
+          null,
+
+        routeStatus:
+          'idle'
 
       });
 
@@ -1174,12 +1148,6 @@ function parseCoordinateString(value) {
       .replace(/\s+/g, ' ');
 
 
-  /*
-    Format KML:
-
-    longitude,latitude,altitude
-  */
-
   const first =
     value.split(/\s+/)[0];
 
@@ -1213,12 +1181,6 @@ function parseCoordinateString(value) {
 
   }
 
-
-  /*
-    Format gx:coord:
-
-    longitude latitude altitude
-  */
 
   const gx =
     value.split(/\s+/);
@@ -1303,6 +1265,7 @@ function getGPS() {
       $('gpsStatus').innerHTML =
         `
           ✅ Lokasi Customer ditemukan<br>
+
           📍 ${currentLocation.lat.toFixed(6)},
           ${currentLocation.lon.toFixed(6)}
         `;
@@ -1473,9 +1436,12 @@ async function searchAdminLocation() {
     $('adminStatus').innerHTML =
       `
         ✅ Alamat ditemukan di OpenStreetMap.<br>
+
         📍 ${currentLocation.lat.toFixed(6)},
         ${currentLocation.lon.toFixed(6)}
+
         <br>
+
         <span class="small">
           ${escapeHtml(
             data[0].display_name || ''
@@ -1489,7 +1455,6 @@ async function searchAdminLocation() {
       findNearest();
 
     }
-
 
   } catch (error) {
 
@@ -1513,6 +1478,7 @@ function showGoogleFallback(message) {
 
   $('adminStatus').className =
     'status warning';
+
 
   $('adminStatus').textContent =
     message ||
@@ -1614,8 +1580,14 @@ $('manualCoordinate')
       $('coordinateStatus').innerHTML =
         `
           ✅ Koordinat berhasil dibaca.<br>
-          📍 Latitude: ${coordinate.lat.toFixed(6)}<br>
-          📍 Longitude: ${coordinate.lon.toFixed(6)}
+
+          📍 Latitude:
+          ${coordinate.lat.toFixed(6)}
+
+          <br>
+
+          📍 Longitude:
+          ${coordinate.lon.toFixed(6)}
         `;
 
 
@@ -1626,6 +1598,7 @@ $('manualCoordinate')
       $('adminStatus').innerHTML =
         `
           ✅ Lokasi Customer menggunakan koordinat Google Maps.<br>
+
           📍 ${coordinate.lat.toFixed(6)},
           ${coordinate.lon.toFixed(6)}
         `;
@@ -1655,12 +1628,6 @@ function parseManualCoordinate(value) {
   let text =
     value.trim();
 
-
-  /*
-    Format:
-
-    -7.246897, 112.731227
-  */
 
   let match =
     text.match(
@@ -1694,12 +1661,6 @@ function parseManualCoordinate(value) {
   }
 
 
-  /*
-    Format:
-
-    -7.246897 112.731227
-  */
-
   match =
     text.match(
       /(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/i
@@ -1731,10 +1692,6 @@ function parseManualCoordinate(value) {
 
   }
 
-
-  /*
-    Google Maps URL / teks lainnya
-  */
 
   const numbers =
     text.match(
@@ -1804,17 +1761,20 @@ function validLatLon(
    FIND NEAREST
 ========================================================= */
 
-function findNearest() {
+async function findNearest() {
 
   if (
     !currentLocation ||
     !points.length
   ) {
-
     return;
-
   }
 
+
+  /*
+    JARAK TETAP MENGGUNAKAN HAVERSINE.
+    JADI SKEMA PEMILIHAN KANTOR TIDAK BERUBAH.
+  */
 
   points.forEach(
     point => {
@@ -1846,89 +1806,328 @@ function findNearest() {
     .remove('hidden');
 
 
-  $('nearestResult').innerHTML = `
+  /*
+    Tampilkan hasil dasar dahulu.
+    Routing OSRM akan mengisi jarak rute
+    dan waktu setelah selesai.
+  */
 
-    <div class="nearest">
+  renderNearest(nearest);
 
-      <span class="badge">
-        TITIK TERDEKAT
+
+  /*
+    Hitung rute mobil:
+    ASAL = KANTOR
+    TUJUAN = CUSTOMER
+  */
+
+  await getRouteInfo(nearest);
+
+}
+
+
+/* =========================================================
+   RENDER HASIL NEAREST
+========================================================= */
+
+function renderNearest(nearest) {
+
+  let routeDistanceHtml =
+    `
+      <span class="route-loading">
+        ⏳ Menghitung rute mobil...
       </span>
+    `;
 
-      <div class="nearest-title">
-        <b>
-          ${escapeHtml(
-            nearest.name
+
+  let routeDurationHtml =
+    `
+      <span class="route-loading">
+        ⏳ Menghitung waktu...
+      </span>
+    `;
+
+
+  if (
+    nearest.routeStatus === 'success'
+  ) {
+
+    routeDistanceHtml =
+      `
+        <span class="route-success">
+          🚗 ${formatRouteDistance(
+            nearest.routeDistance
           )}
-        </b>
-      </div>
+        </span>
+      `;
 
-      <div class="nearest-coord">
-        📍 ${nearest.lat.toFixed(6)},
-        ${nearest.lon.toFixed(6)}
-      </div>
 
-      <div class="nearest-distance">
-        📏 <b>
-          ${formatDistance(
-            nearest.distance
+    routeDurationHtml =
+      `
+        <span class="route-success">
+          ⏱️ ${formatDuration(
+            nearest.routeDuration
           )}
-        </b>
-      </div>
+        </span>
+      `;
 
-      ${
-        nearest.description
-          ? `
-            <div class="nearest-description">
-              ${escapeHtml(
-                nearest.description
-              )}
-            </div>
-          `
-          : ''
-      }
+  }
 
-      <div class="route-info">
 
-        <b>ASAL</b>
+  if (
+    nearest.routeStatus === 'error'
+  ) {
 
-        <div class="route-value">
-          ${escapeHtml(
-            nearest.name
-          )}
+    routeDistanceHtml =
+      `
+        <span class="route-warning">
+          ⚠️ Rute tidak tersedia
+        </span>
+      `;
+
+
+    routeDurationHtml =
+      `
+        <span class="route-warning">
+          ⚠️ Tidak tersedia
+        </span>
+      `;
+
+  }
+
+
+  $('nearestResult').innerHTML =
+
+    `
+      <div class="nearest">
+
+        <span class="badge">
+          TITIK TERDEKAT
+        </span>
+
+
+        <div class="nearest-title">
+
+          <b>
+            ${escapeHtml(
+              nearest.name
+            )}
+          </b>
+
         </div>
 
-        <b>TUJUAN</b>
 
-        <div class="route-value">
-          CUSTOMER
+        <div class="nearest-coord">
+
+          📍 ${nearest.lat.toFixed(6)},
+          ${nearest.lon.toFixed(6)}
+
+        </div>
+
+
+        <div class="nearest-distance">
+
+          📏 <b>
+            ${formatDistance(
+              nearest.distance
+            )}
+          </b>
+
+        </div>
+
+
+        ${
+          nearest.description
+
+            ? `
+              <div class="nearest-description">
+
+                ${escapeHtml(
+                  nearest.description
+                )}
+
+              </div>
+            `
+
+            : ''
+        }
+
+
+        <div class="route-info">
+
+          <b>JARAK RUTE</b>
+
+          <div class="route-value">
+            ${routeDistanceHtml}
+          </div>
+
+
+          <b>WAKTU TEMPUH</b>
+
+          <div class="route-value">
+            ${routeDurationHtml}
+          </div>
+
+
+          <b>ASAL</b>
+
+          <div class="route-value">
+            ${escapeHtml(
+              nearest.name
+            )}
+          </div>
+
+
+          <b>TUJUAN</b>
+
+          <div class="route-value">
+            CUSTOMER
+          </div>
+
+        </div>
+
+
+        <div class="nearest-navigation">
+
+          <a
+            class="maps"
+            href="${mapsUrl(
+              nearest.lat,
+              nearest.lon,
+              currentLocation.lat,
+              currentLocation.lon
+            )}"
+            target="_blank"
+            rel="noopener"
+          >
+            🧭 KANTOR → CUSTOMER
+          </a>
+
         </div>
 
       </div>
+    `;
 
-      <div class="nearest-navigation">
-
-        <a
-          class="maps"
-          href="${mapsUrl(
-            nearest.lat,
-            nearest.lon,
-            currentLocation.lat,
-            currentLocation.lon
-          )}"
-          target="_blank"
-          rel="noopener"
-        >
-          🧭 KANTOR → CUSTOMER
-        </a>
-
-      </div>
-
-    </div>
-
-  `;
+}
 
 
-  renderPoints();
+/* =========================================================
+   OSRM - HITUNG RUTE MOBIL
+========================================================= */
+
+async function getRouteInfo(point) {
+
+  if (
+    !currentLocation ||
+    !point
+  ) {
+    return;
+  }
+
+
+  point.routeStatus =
+    'loading';
+
+
+  renderNearest(point);
+
+
+  try {
+
+    /*
+      OSRM menggunakan:
+      longitude,latitude
+    */
+
+    const origin =
+      `${point.lon},${point.lat}`;
+
+
+    const destination =
+      `${currentLocation.lon},${currentLocation.lat}`;
+
+
+    const url =
+      `${OSRM_URL}/${origin};${destination}` +
+      `?overview=false`;
+
+
+    const response =
+      await fetch(
+        url,
+        {
+          method: 'GET',
+          cache: 'no-store'
+        }
+      );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        `Routing server HTTP ${response.status}`
+      );
+
+    }
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      data.code !== 'Ok' ||
+      !data.routes ||
+      !data.routes.length
+    ) {
+
+      throw new Error(
+        'Rute kendaraan tidak ditemukan.'
+      );
+
+    }
+
+
+    const route =
+      data.routes[0];
+
+
+    point.routeDistance =
+      route.distance;
+
+
+    point.routeDuration =
+      route.duration;
+
+
+    point.routeStatus =
+      'success';
+
+
+    renderNearest(point);
+
+
+  } catch (error) {
+
+    console.error(
+      'OSRM routing gagal:',
+      error
+    );
+
+
+    point.routeDistance =
+      null;
+
+    point.routeDuration =
+      null;
+
+    point.routeStatus =
+      'error';
+
+
+    renderNearest(point);
+
+  }
 
 }
 
@@ -1998,69 +2197,84 @@ function renderPoints() {
 
       const navigationText =
         currentLocation
+
           ? '🧭 Kantor → Customer'
+
           : '🗺️ Buka Titik';
 
 
-      tr.innerHTML = `
+      tr.innerHTML =
 
-        <td>
-          ${index + 1}
-        </td>
+        `
+          <td>
+            ${index + 1}
+          </td>
 
-        <td>
 
-          <b>
-            ${escapeHtml(
-              point.name
-            )}
-          </b>
+          <td>
 
-          ${
-            point.description
-              ? `
-                <div class="small mt10">
-                  ${escapeHtml(
-                    point.description
-                  )}
-                </div>
-              `
-              : ''
-          }
+            <b>
+              ${escapeHtml(
+                point.name
+              )}
+            </b>
 
-        </td>
 
-        <td>
-          ${point.lat.toFixed(6)}<br>
-          ${point.lon.toFixed(6)}
-        </td>
+            ${
+              point.description
 
-        <td>
+                ? `
+                  <div class="small mt10">
+                    ${escapeHtml(
+                      point.description
+                    )}
+                  </div>
+                `
 
-          ${
-            point.distance !== null
-              ? formatDistance(
-                  point.distance
-                )
-              : '-'
-          }
+                : ''
+            }
 
-        </td>
+          </td>
 
-        <td>
 
-          <a
-            class="maps"
-            href="${navigationUrl}"
-            target="_blank"
-            rel="noopener"
-          >
-            ${navigationText}
-          </a>
+          <td>
 
-        </td>
+            ${point.lat.toFixed(6)}
+            <br>
+            ${point.lon.toFixed(6)}
 
-      `;
+          </td>
+
+
+          <td>
+
+            ${
+              point.distance !== null
+
+                ? formatDistance(
+                    point.distance
+                  )
+
+                : '-'
+            }
+
+          </td>
+
+
+          <td>
+
+            <a
+              class="maps"
+              href="${navigationUrl}"
+              target="_blank"
+              rel="noopener"
+            >
+              ${navigationText}
+            </a>
+
+          </td>
+
+        `;
 
 
       tbody.appendChild(tr);
@@ -2118,6 +2332,7 @@ function haversine(
 
   const c =
     2 *
+
     Math.atan2(
       Math.sqrt(a),
       Math.sqrt(1 - a)
@@ -2180,6 +2395,99 @@ function formatDistance(km) {
 
 
 /* =========================================================
+   FORMAT JARAK RUTE OSRM
+========================================================= */
+
+function formatRouteDistance(meters) {
+
+  if (
+    !Number.isFinite(meters)
+  ) {
+
+    return '-';
+
+  }
+
+
+  const km =
+    meters / 1000;
+
+
+  if (km < 1) {
+
+    return (
+      Math.round(meters) +
+      ' m'
+    );
+
+  }
+
+
+  return (
+    km.toFixed(2) +
+    ' km'
+  );
+
+}
+
+
+/* =========================================================
+   FORMAT WAKTU RUTE OSRM
+========================================================= */
+
+function formatDuration(seconds) {
+
+  if (
+    !Number.isFinite(seconds)
+  ) {
+
+    return '-';
+
+  }
+
+
+  const totalMinutes =
+    Math.round(
+      seconds / 60
+    );
+
+
+  if (totalMinutes < 1) {
+
+    return '< 1 menit';
+
+  }
+
+
+  const hours =
+    Math.floor(
+      totalMinutes / 60
+    );
+
+
+  const minutes =
+    totalMinutes % 60;
+
+
+  if (hours > 0) {
+
+    if (minutes === 0) {
+
+      return `${hours} jam`;
+
+    }
+
+    return `${hours} jam ${minutes} menit`;
+
+  }
+
+
+  return `${totalMinutes} menit`;
+
+}
+
+
+/* =========================================================
    GOOGLE MAPS DIRECTIONS
 ========================================================= */
 
@@ -2204,14 +2512,17 @@ function mapsUrl(
 
   return (
     'https://www.google.com/maps/dir/?api=1' +
+
     '&origin=' +
     encodeURIComponent(
       origin
     ) +
+
     '&destination=' +
     encodeURIComponent(
       destination
     ) +
+
     '&travelmode=driving'
   );
 
@@ -2229,7 +2540,9 @@ function mapsPointUrl(
 
   return (
     'https://www.google.com/maps/search/?api=1' +
+
     '&query=' +
+
     encodeURIComponent(
       lat +
       ',' +
