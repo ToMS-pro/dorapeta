@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+
 <html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Finder Titik Terdekat - KIB</title>
+<title>Finder Titik Terdekat</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
@@ -418,6 +419,7 @@ tr.nearest-row {
   }
 }
 </style>
+
 </head>
 
 <body>
@@ -425,266 +427,156 @@ tr.nearest-row {
 <div class="container">
 
   <!-- HEADER -->
+
   <div class="card">
 
-    <h1>📍 Finder Titik Terdekat</h1>
+```
+<h1>📍 Finder Titik Terdekat</h1>
 
-    <div class="small">
-      Cari kantor terdekat dari lokasi Customer menggunakan data KML / KMZ KIB.
-    </div>
+<div class="small">
+  Cari kantor terdekat dari lokasi Customer menggunakan data KML / KMZ KIB.
+</div>
+```
 
   </div>
 
-
   <!-- MODE -->
+
   <div class="card">
 
-    <h2>1. Pilih Mode</h2>
+```
+<h2>1. Pilih Mode</h2>
 
-    <div class="mode-buttons">
+<div class="mode-buttons">
 
-      <button
-        id="customerMode"
-        class="mode-btn active"
-        onclick="setMode('customer')"
-      >
-        📱 Customer
-      </button>
+  <button
+    id="customerMode"
+    class="mode-btn active"
+    onclick="setMode('customer')"
+  >
+    📱 Customer
+  </button>
 
-      <button
-        id="adminMode"
-        class="mode-btn secondary"
-        onclick="setMode('admin')"
-      >
-        🖥️ Admin
-      </button>
+  <button
+    id="adminMode"
+    class="mode-btn secondary"
+    onclick="setMode('admin')"
+  >
+    🖥️ Admin
+  </button>
+
+</div>
+
+
+<!-- CUSTOMER -->
+<div id="customerPanel">
+
+  <button
+    class="blue"
+    onclick="getGPS()"
+  >
+    📍 Ambil Lokasi GPS
+  </button>
+
+  <div
+    id="gpsStatus"
+    class="status"
+  >
+    Lokasi Customer belum diambil.
+  </div>
+
+</div>
+
+
+<!-- ADMIN -->
+<div
+  id="adminPanel"
+  class="hidden"
+>
+
+  <label for="adminAddress">
+    Alamat Customer
+  </label>
+
+  <input
+    type="text"
+    id="adminAddress"
+    placeholder="Contoh: Jl. Raya Darmo Surabaya"
+    onkeydown="handleAddressKey(event)"
+  >
+
+  <button
+    class="blue mt10"
+    onclick="searchAdminLocation()"
+  >
+    🔎 Cari Alamat
+  </button>
+
+  <div
+    id="adminStatus"
+    class="status"
+  >
+    Masukkan alamat Customer.
+  </div>
+
+
+  <!-- GOOGLE FALLBACK -->
+  <div
+    id="googleFallback"
+    class="hidden"
+  >
+
+    <div class="help-box">
+
+      <b>⚠️ Alamat tidak ditemukan di OpenStreetMap.</b>
+
+      <br><br>
+
+      Coba cari alamat tersebut di Google Maps.
+      Setelah lokasi ditemukan, copy koordinatnya lalu paste
+      ke kotak di bawah.
+
+      <br><br>
+
+      Contoh koordinat:
+      <br>
+
+      <b>-7.246897, 112.731227</b>
 
     </div>
 
-
-    <!-- CUSTOMER -->
-    <div id="customerPanel">
-
-      <button
-        class="blue"
-        onclick="getGPS()"
-      >
-        📍 Ambil Lokasi GPS
-      </button>
-
-      <div
-        id="gpsStatus"
-        class="status"
-      >
-        Lokasi Customer belum diambil.
-      </div>
-
-    </div>
-
-
-    <!-- ADMIN -->
-    <div
-      id="adminPanel"
-      class="hidden"
+    <button
+      id="googleSearchButton"
+      class="google mt10"
+      onclick="openGoogleSearch()"
     >
+      🌐 Buka di Google Maps
+    </button>
 
-      <label for="adminAddress">
-        Alamat Customer
+
+    <div class="coordinate-box">
+
+      <label for="manualCoordinate">
+        📍 Paste Koordinat dari Google Maps
       </label>
 
       <input
         type="text"
-        id="adminAddress"
-        placeholder="Contoh: Jl. Raya Darmo Surabaya"
-        onkeydown="handleAddressKey(event)"
+        id="manualCoordinate"
+        placeholder="-7.246897, 112.731227"
+        autocomplete="off"
       >
 
-      <button
-        class="blue mt10"
-        onclick="searchAdminLocation()"
-      >
-        🔎 Cari Alamat
-      </button>
+      <div class="small">
+        Setelah koordinat ditempel, aplikasi akan otomatis
+        membaca Latitude dan Longitude.
+      </div>
 
       <div
-        id="adminStatus"
+        id="coordinateStatus"
         class="status"
       >
-        Masukkan alamat Customer.
-      </div>
-
-
-      <!-- GOOGLE FALLBACK -->
-      <div
-        id="googleFallback"
-        class="hidden"
-      >
-
-        <div class="help-box">
-
-          <b>⚠️ Alamat tidak ditemukan di OpenStreetMap.</b>
-
-          <br><br>
-
-          Coba cari alamat tersebut di Google Maps.
-          Setelah lokasi ditemukan, copy koordinatnya lalu paste
-          ke kotak di bawah.
-
-          <br><br>
-
-          Contoh koordinat:
-
-          <br>
-
-          <b>-7.246897, 112.731227</b>
-
-        </div>
-
-        <button
-          id="googleSearchButton"
-          class="google mt10"
-          onclick="openGoogleSearch()"
-        >
-          🌐 Buka di Google Maps
-        </button>
-
-
-        <div class="coordinate-box">
-
-          <label for="manualCoordinate">
-            📍 Paste Koordinat dari Google Maps
-          </label>
-
-          <input
-            type="text"
-            id="manualCoordinate"
-            placeholder="-7.246897, 112.731227"
-            autocomplete="off"
-          >
-
-          <div class="small">
-            Setelah koordinat ditempel, aplikasi akan otomatis
-            membaca Latitude dan Longitude.
-          </div>
-
-          <div
-            id="coordinateStatus"
-            class="status"
-          >
-            Menunggu koordinat.
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-
-  </div>
-
-
-  <!-- DATA KMZ OTOMATIS -->
-  <div class="card">
-
-    <h2>2. Data Titik Kantor</h2>
-
-    <div
-      id="fileStatus"
-      class="status"
-    >
-      ⏳ Memuat data titik kantor...
-    </div>
-
-  </div>
-
-
-  <!-- HASIL TITIK TERDEKAT -->
-  <div
-    id="nearestCard"
-    class="card hidden"
-  >
-
-    <h2>📌 Hasil Titik Terdekat</h2>
-
-    <div id="nearestResult"></div>
-
-  </div>
-
-
-  <!-- DAFTAR TITIK -->
-  <div
-    id="pointsCard"
-    class="card hidden"
-  >
-
-    <h2>📋 Daftar Titik</h2>
-
-    <div
-      id="pointsInfo"
-      class="small mt10"
-    ></div>
-
-    <div class="table-wrap mt10">
-
-      <table>
-
-        <thead>
-
-          <tr>
-            <th>No</th>
-            <th>Kantor / Titik</th>
-            <th>Koordinat</th>
-            <th>Jarak</th>
-            <th>Navigasi</th>
-          </tr>
-
-        </thead>
-
-        <tbody id="pointsTable"></tbody>
-
-      </table>
-
-    </div>
-
-  </div>
-
-
-  <!-- TEST AREA -->
-  <div class="card">
-
-    <h2>🧪 Area Uji Coba</h2>
-
-    <div class="small">
-      Bagian ini boleh dihapus setelah sistem sudah fix.
-    </div>
-
-    <div class="test-box">
-
-      <b>Uji parser koordinat:</b>
-
-      <div class="test-row">
-
-        <button
-          class="dark"
-          onclick="testCoordinate('-7.246897, 112.731227')"
-        >
-          Test Lat, Lon
-        </button>
-
-        <button
-          class="dark"
-          onclick="testCoordinate('-7.246897 112.731227')"
-        >
-          Test Lat Lon
-        </button>
-
-        <button
-          class="dark"
-          onclick="testCoordinate('https://maps.google.com/?q=-7.246897,112.731227')"
-        >
-          Test Link Google
-        </button>
-
+        Menunggu koordinat.
       </div>
 
     </div>
@@ -692,7 +584,134 @@ tr.nearest-row {
   </div>
 
 </div>
+```
 
+  </div>
+
+  <!-- DATA KMZ OTOMATIS -->
+
+  <div class="card">
+
+```
+<h2>2. Data Titik Kantor</h2>
+
+<div
+  id="fileStatus"
+  class="status"
+>
+  ⏳ Memuat data titik kantor...
+</div>
+```
+
+  </div>
+
+  <!-- HASIL TITIK TERDEKAT -->
+
+  <div
+    id="nearestCard"
+    class="card hidden"
+  >
+
+```
+<h2>📌 Hasil Titik Terdekat</h2>
+
+<div id="nearestResult"></div>
+```
+
+  </div>
+
+  <!-- DAFTAR TITIK -->
+
+  <div
+    id="pointsCard"
+    class="card hidden"
+  >
+
+```
+<h2>📋 Daftar Titik</h2>
+
+<div
+  id="pointsInfo"
+  class="small mt10"
+></div>
+
+<div class="table-wrap mt10">
+
+  <table>
+
+    <thead>
+
+      <tr>
+
+        <th>No</th>
+
+        <th>Kantor / Titik</th>
+
+        <th>Koordinat</th>
+
+        <th>Jarak</th>
+
+        <th>Navigasi</th>
+
+      </tr>
+
+    </thead>
+
+    <tbody id="pointsTable"></tbody>
+
+  </table>
+
+</div>
+```
+
+  </div>
+
+  <!-- TEST AREA -->
+
+  <div class="card">
+
+```
+<h2>🧪 Area Uji Coba</h2>
+
+<div class="small">
+  Bagian ini boleh dihapus setelah sistem sudah fix.
+</div>
+
+<div class="test-box">
+
+  <b>Uji parser koordinat:</b>
+
+  <div class="test-row">
+
+    <button
+      class="dark"
+      onclick="testCoordinate('-7.246897, 112.731227')"
+    >
+      Test Lat, Lon
+    </button>
+
+    <button
+      class="dark"
+      onclick="testCoordinate('-7.246897 112.731227')"
+    >
+      Test Lat Lon
+    </button>
+
+    <button
+      class="dark"
+      onclick="testCoordinate('https://maps.google.com/?q=-7.246897,112.731227')"
+    >
+      Test Link Google
+    </button>
+
+  </div>
+
+</div>
+```
+
+  </div>
+
+</div>
 
 <script>
 
@@ -709,7 +728,7 @@ const $ = id => document.getElementById(id);
 
 
 /* =========================================================
-   NAMA FILE KMZ DI GITHUB
+   NAMA FILE KMZ
 ========================================================= */
 
 const KMZ_FILE =
@@ -795,7 +814,7 @@ function handleAddressKey(event) {
 
 
 /* =========================================================
-   AUTO LOAD KMZ DARI GITHUB
+   AUTO LOAD KMZ
 ========================================================= */
 
 async function loadKMZAutomatically() {
@@ -1279,7 +1298,6 @@ function getGPS() {
 
     },
 
-
     error => {
 
       console.error(error);
@@ -1299,14 +1317,12 @@ function getGPS() {
           'Izin lokasi ditolak. Aktifkan GPS/location permission.';
 
       }
-
       else if (error.code === 2) {
 
         message =
           'Lokasi tidak tersedia.';
 
       }
-
       else if (error.code === 3) {
 
         message =
@@ -1319,7 +1335,6 @@ function getGPS() {
         '❌ GPS gagal: ' + message;
 
     },
-
 
     {
       enableHighAccuracy: true,
@@ -1748,10 +1763,15 @@ function validLatLon(
 ) {
 
   return (
+
     Number.isFinite(lat) &&
+
     Number.isFinite(lon) &&
+
     Math.abs(lat) <= 90 &&
+
     Math.abs(lon) <= 180
+
   );
 
 }
@@ -1767,13 +1787,15 @@ async function findNearest() {
     !currentLocation ||
     !points.length
   ) {
+
     return;
+
   }
 
 
   /*
-    JARAK TETAP MENGGUNAKAN HAVERSINE.
-    JADI SKEMA PEMILIHAN KANTOR TIDAK BERUBAH.
+    HITUNG JARAK SEMUA KANTOR
+    DARI LOKASI CUSTOMER
   */
 
   points.forEach(
@@ -1791,11 +1813,24 @@ async function findNearest() {
   );
 
 
+  /*
+    =====================================================
+    INI BAGIAN PENTING
+    URUTKAN SEMUA 102 TITIK:
+    TERDEKAT → TERJAUH
+    =====================================================
+  */
+
   points.sort(
     (a, b) =>
       a.distance - b.distance
   );
 
+
+  /*
+    SETELAH SORTING,
+    points[0] SELALU KANTOR TERDEKAT
+  */
 
   const nearest =
     points[0];
@@ -1807,12 +1842,20 @@ async function findNearest() {
 
 
   /*
-    Tampilkan hasil dasar dahulu.
-    Routing OSRM akan mengisi jarak rute
-    dan waktu setelah selesai.
+    Tampilkan kartu titik terdekat
   */
 
   renderNearest(nearest);
+
+
+  /*
+    =====================================================
+    PENTING:
+    RENDER ULANG TABEL SETELAH SORTING
+    =====================================================
+  */
+
+  renderPoints();
 
 
   /*
@@ -2021,7 +2064,9 @@ async function getRouteInfo(point) {
     !currentLocation ||
     !point
   ) {
+
     return;
+
   }
 
 
@@ -2106,8 +2151,9 @@ async function getRouteInfo(point) {
 
     renderNearest(point);
 
+  }
 
-  } catch (error) {
+  catch (error) {
 
     console.error(
       'OSRM routing gagal:',
@@ -2118,8 +2164,10 @@ async function getRouteInfo(point) {
     point.routeDistance =
       null;
 
+
     point.routeDuration =
       null;
+
 
     point.routeStatus =
       'error';
@@ -2133,7 +2181,8 @@ async function getRouteInfo(point) {
 
 
 /* =========================================================
-   RENDER POINTS
+   RENDER SEMUA POINT
+   SELALU MENGIKUTI URUTAN ARRAY points
 ========================================================= */
 
 function renderPoints() {
@@ -2149,7 +2198,7 @@ function renderPoints() {
 
 
   $('pointsInfo').textContent =
-    `${points.length} titik ditemukan`;
+    `${points.length} titik ditemukan — diurutkan dari kantor terdekat ke terjauh`;
 
 
   const tbody =
@@ -2160,12 +2209,21 @@ function renderPoints() {
     '';
 
 
+  /*
+    points SUDAH DIURUTKAN oleh findNearest().
+    Jadi index 0 = terdekat.
+  */
+
   points.forEach(
     (point, index) => {
 
       const tr =
         document.createElement('tr');
 
+
+      /*
+        Baris nomor 1 = titik terdekat
+      */
 
       if (
         index === 0 &&
@@ -2240,7 +2298,9 @@ function renderPoints() {
           <td>
 
             ${point.lat.toFixed(6)}
+
             <br>
+
             ${point.lon.toFixed(6)}
 
           </td>
@@ -2280,6 +2340,7 @@ function renderPoints() {
       tbody.appendChild(tr);
 
     }
+
   );
 
 }
@@ -2313,6 +2374,7 @@ function haversine(
 
 
   const a =
+
     Math.sin(
       dLat / 2
     ) ** 2 +
@@ -2351,9 +2413,13 @@ function haversine(
 function toRad(value) {
 
   return (
+
     value *
+
     Math.PI /
+
     180
+
   );
 
 }
@@ -2377,18 +2443,24 @@ function formatDistance(km) {
   if (km < 1) {
 
     return (
+
       Math.round(
         km * 1000
       ) +
+
       ' m'
+
     );
 
   }
 
 
   return (
+
     km.toFixed(2) +
+
     ' km'
+
   );
 
 }
@@ -2416,16 +2488,22 @@ function formatRouteDistance(meters) {
   if (km < 1) {
 
     return (
+
       Math.round(meters) +
+
       ' m'
+
     );
 
   }
 
 
   return (
+
     km.toFixed(2) +
+
     ' km'
+
   );
 
 }
@@ -2477,6 +2555,7 @@ function formatDuration(seconds) {
 
     }
 
+
     return `${hours} jam ${minutes} menit`;
 
   }
@@ -2511,19 +2590,23 @@ function mapsUrl(
 
 
   return (
+
     'https://www.google.com/maps/dir/?api=1' +
 
     '&origin=' +
+
     encodeURIComponent(
       origin
     ) +
 
     '&destination=' +
+
     encodeURIComponent(
       destination
     ) +
 
     '&travelmode=driving'
+
   );
 
 }
@@ -2539,6 +2622,7 @@ function mapsPointUrl(
 ) {
 
   return (
+
     'https://www.google.com/maps/search/?api=1' +
 
     '&query=' +
@@ -2548,6 +2632,7 @@ function mapsPointUrl(
       ',' +
       lon
     )
+
   );
 
 }
