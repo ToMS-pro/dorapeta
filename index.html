@@ -7,7 +7,12 @@
 
 <title>Finder Titik Terdekat</title>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <style>
 * {
@@ -359,6 +364,36 @@ tr.nearest-row {
   opacity: .6;
 }
 
+/* PETA LEAFLET */
+#kibMap {
+  width: 100%;
+  height: 480px;
+  border-radius: 10px;
+  border: 1px solid #d9dee3;
+  z-index: 1;
+  background: #e9ecef;
+}
+.map-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #495057;
+}
+.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.legend-blue { background: #0d6efd; }
+.legend-green { background: #198754; }
+.legend-red { background: #dc3545; }
+.kib-pin {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.45);
+}
+.kib-pin.office { background: #0d6efd; }
+.kib-pin.nearest { background: #198754; width: 20px; height: 20px; border-width: 3px; }
+.kib-pin.customer { background: #dc3545; width: 20px; height: 20px; border-width: 3px; }
+
 .test-box {
   margin-top: 12px;
   padding: 10px;
@@ -408,6 +443,8 @@ tr.nearest-row {
     font-size: 11px;
   }
 
+  #kibMap { height: 380px; }
+
   .route-info {
     grid-template-columns: 110px 1fr;
     font-size: 11px;
@@ -430,13 +467,11 @@ tr.nearest-row {
 
   <div class="card">
 
-```
 <h1>📍 Finder Titik Terdekat</h1>
 
 <div class="small">
   Cari kantor terdekat dari lokasi Customer menggunakan data KML / KMZ KIB.
 </div>
-```
 
   </div>
 
@@ -444,7 +479,6 @@ tr.nearest-row {
 
   <div class="card">
 
-```
 <h2>1. Pilih Mode</h2>
 
 <div class="mode-buttons">
@@ -584,7 +618,6 @@ tr.nearest-row {
   </div>
 
 </div>
-```
 
   </div>
 
@@ -592,7 +625,6 @@ tr.nearest-row {
 
   <div class="card">
 
-```
 <h2>2. Data Titik Kantor</h2>
 
 <div
@@ -601,7 +633,6 @@ tr.nearest-row {
 >
   ⏳ Memuat data titik kantor...
 </div>
-```
 
   </div>
 
@@ -612,12 +643,23 @@ tr.nearest-row {
     class="card hidden"
   >
 
-```
 <h2>📌 Hasil Titik Terdekat</h2>
 
 <div id="nearestResult"></div>
-```
 
+  </div>
+
+  <!-- PETA SEMUA TITIK KIB -->
+  <div id="mapCard" class="card">
+    <h2>🗺️ Peta Titik Kantor KIB</h2>
+    <div class="small">Semua titik kantor dari KMZ ditampilkan di peta. Gunakan zoom untuk melihat titik yang berdekatan.</div>
+    <div id="kibMap" class="mt10"></div>
+    <div class="map-legend">
+      <span><i class="legend-dot legend-blue"></i> Kantor KIB</span>
+      <span><i class="legend-dot legend-green"></i> Kantor terdekat</span>
+      <span><i class="legend-dot legend-red"></i> Customer</span>
+    </div>
+    <div id="mapStatus" class="small mt10">Menunggu data titik kantor...</div>
   </div>
 
   <!-- DAFTAR TITIK -->
@@ -627,7 +669,6 @@ tr.nearest-row {
     class="card hidden"
   >
 
-```
 <h2>📋 Daftar Titik</h2>
 
 <div
@@ -662,7 +703,6 @@ tr.nearest-row {
   </table>
 
 </div>
-```
 
   </div>
 
@@ -670,7 +710,6 @@ tr.nearest-row {
 
   <div class="card">
 
-```
 <h2>🧪 Area Uji Coba</h2>
 
 <div class="small">
@@ -707,7 +746,6 @@ tr.nearest-row {
   </div>
 
 </div>
-```
 
   </div>
 
@@ -723,6 +761,12 @@ let mode = 'customer';
 let points = [];
 let currentLocation = null;
 let lastAdminAddress = '';
+let kibMap = null;
+let officeMarkerLayer = null;
+let customerMarker = null;
+let nearestMarker = null;
+let routeLine = null;
+let mapHasInitialFit = false;
 
 const $ = id => document.getElementById(id);
 
@@ -918,6 +962,9 @@ async function loadKMZAutomatically() {
       .classList
       .remove('hidden');
 
+
+    initKibMap();
+    renderMapPoints();
 
     if (currentLocation) {
 
@@ -1856,6 +1903,8 @@ async function findNearest() {
   */
 
   renderPoints();
+  updateMapLocationAndNearest(nearest);
+  if (routeLine && kibMap) { kibMap.removeLayer(routeLine); routeLine = null; }
 
 
   /*
@@ -2094,7 +2143,7 @@ async function getRouteInfo(point) {
 
     const url =
       `${OSRM_URL}/${origin};${destination}` +
-      `?overview=false`;
+      `?overview=full&geometries=geojson`;
 
 
     const response =
@@ -2144,12 +2193,16 @@ async function getRouteInfo(point) {
     point.routeDuration =
       route.duration;
 
+    point.routeGeometry =
+      route.geometry && route.geometry.coordinates
+        ? route.geometry.coordinates
+        : null;
 
     point.routeStatus =
       'success';
 
-
     renderNearest(point);
+    drawMapRoute(point);
 
   }
 
@@ -2167,16 +2220,138 @@ async function getRouteInfo(point) {
 
     point.routeDuration =
       null;
-
+    point.routeGeometry = null;
 
     point.routeStatus =
       'error';
 
-
     renderNearest(point);
+    drawMapRoute(point);
 
   }
 
+}
+
+
+/* =========================================================
+   PETA LEAFLET + MARKER CLUSTER
+========================================================= */
+
+function makeMapIcon(type) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="kib-pin ${type}"></div>`,
+    iconSize: type === 'office' ? [16, 16] : [20, 20],
+    iconAnchor: type === 'office' ? [8, 8] : [10, 10]
+  });
+}
+
+function initKibMap() {
+  if (kibMap) {
+    setTimeout(() => kibMap.invalidateSize(), 100);
+    return;
+  }
+
+  if (!window.L) {
+    $('mapStatus').textContent = 'Peta gagal dimuat. Periksa koneksi internet untuk memuat Leaflet.';
+    return;
+  }
+
+  kibMap = L.map('kibMap').setView([-7.25, 112.73], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(kibMap);
+
+  officeMarkerLayer = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    chunkedLoading: true,
+    maxClusterRadius: 45
+  });
+  kibMap.addLayer(officeMarkerLayer);
+
+  setTimeout(() => kibMap.invalidateSize(), 150);
+}
+
+function renderMapPoints() {
+  if (!points.length) return;
+  initKibMap();
+  if (!kibMap || !officeMarkerLayer) return;
+
+  officeMarkerLayer.clearLayers();
+  points.forEach(point => {
+    const marker = L.marker([point.lat, point.lon], {
+      icon: makeMapIcon('office'),
+      title: point.name
+    });
+    marker.bindPopup(`<b>${escapeHtml(point.name)}</b><br>${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}`);
+    officeMarkerLayer.addLayer(marker);
+  });
+
+  $('mapStatus').textContent = `${points.length} titik kantor KIB tampil di peta. Zoom untuk melihat titik yang berdekatan.`;
+
+  if (!mapHasInitialFit && officeMarkerLayer.getLayers().length) {
+    kibMap.fitBounds(officeMarkerLayer.getBounds().pad(0.08), { maxZoom: 11 });
+    mapHasInitialFit = true;
+  }
+  setTimeout(() => kibMap.invalidateSize(), 100);
+}
+
+function updateMapLocationAndNearest(nearest) {
+  if (!kibMap) initKibMap();
+  if (!kibMap) return;
+
+  if (nearestMarker) kibMap.removeLayer(nearestMarker);
+  if (customerMarker) kibMap.removeLayer(customerMarker);
+
+  if (nearest) {
+    nearestMarker = L.marker([nearest.lat, nearest.lon], {
+      icon: makeMapIcon('nearest'),
+      zIndexOffset: 900
+    }).addTo(kibMap);
+    nearestMarker.bindPopup(`<b>⭐ KANTOR TERDEKAT</b><br>${escapeHtml(nearest.name)}<br>Jarak garis lurus: ${formatDistance(nearest.distance)}`);
+  }
+
+  if (currentLocation) {
+    customerMarker = L.marker([currentLocation.lat, currentLocation.lon], {
+      icon: makeMapIcon('customer'),
+      zIndexOffset: 1000
+    }).addTo(kibMap);
+    customerMarker.bindPopup(`<b>📍 LOKASI CUSTOMER</b><br>${currentLocation.lat.toFixed(6)}, ${currentLocation.lon.toFixed(6)}`);
+  }
+
+  if (nearest && currentLocation) {
+    const bounds = L.latLngBounds(
+      [nearest.lat, nearest.lon],
+      [currentLocation.lat, currentLocation.lon]
+    );
+    kibMap.fitBounds(bounds.pad(0.25), { maxZoom: 14 });
+  }
+  setTimeout(() => kibMap.invalidateSize(), 100);
+}
+
+function drawMapRoute(point) {
+  if (!kibMap) return;
+  if (routeLine) {
+    kibMap.removeLayer(routeLine);
+    routeLine = null;
+  }
+
+  if (!point || !point.routeGeometry || !point.routeGeometry.length) return;
+
+  const latLngs = point.routeGeometry.map(coord => [coord[1], coord[0]]);
+  routeLine = L.polyline(latLngs, {
+    color: '#198754',
+    weight: 5,
+    opacity: 0.85,
+    lineCap: 'round',
+    lineJoin: 'round'
+  }).addTo(kibMap);
+
+  routeLine.bindPopup(`<b>Rute Kantor → Customer</b><br>${formatRouteDistance(point.routeDistance)} · ${formatDuration(point.routeDuration)}`);
+  const bounds = routeLine.getBounds();
+  if (bounds.isValid()) kibMap.fitBounds(bounds.pad(0.18), { maxZoom: 15 });
 }
 
 
