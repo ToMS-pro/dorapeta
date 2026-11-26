@@ -386,6 +386,13 @@ tr.nearest-row {
 .legend-blue { background: #0d6efd; }
 .legend-green { background: #198754; }
 .legend-red { background: #dc3545; }
+.legend-radius { width: 18px; height: 12px; border: 2px solid #0d6efd; background: rgba(13,110,253,.14); border-radius: 3px; display: inline-block; }
+.radius-label {
+  display: inline-block; padding: 5px 9px; border: 1px solid #0b5ed7;
+  border-radius: 6px; background: rgba(13,110,253,.94); color: #fff;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 1px 5px rgba(0,0,0,.35);
+}
 .kib-pin {
   width: 16px; height: 16px; border-radius: 50%;
   border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.45);
@@ -658,6 +665,7 @@ tr.nearest-row {
       <span><i class="legend-dot legend-blue"></i> Kantor KIB</span>
       <span><i class="legend-dot legend-green"></i> Kantor terdekat</span>
       <span><i class="legend-dot legend-red"></i> Customer</span>
+      <span><i class="legend-radius"></i> Radius kantor 30 km</span>
     </div>
     <div id="mapStatus" class="small mt10">Menunggu data titik kantor...</div>
   </div>
@@ -766,7 +774,9 @@ let officeMarkerLayer = null;
 let customerMarker = null;
 let nearestMarker = null;
 let routeLine = null;
+let radiusLayer = null;
 let mapHasInitialFit = false;
+const OFFICE_RADIUS_KM = 30;
 
 const $ = id => document.getElementById(id);
 
@@ -784,8 +794,10 @@ const KMZ_FILE =
    TANPA API KEY / TANPA GOOGLE API BERBAYAR
 ========================================================= */
 
-const OSRM_URL =
-  "https://router.project-osrm.org/route/v1/driving";
+const OSRM_SERVERS = [
+  "https://router.project-osrm.org/route/v1/driving",
+  "https://routing.openstreetmap.de/routed-car/route/v1/driving"
+];
 
 
 /* =========================================================
@@ -1973,7 +1985,7 @@ function renderNearest(nearest) {
     routeDistanceHtml =
       `
         <span class="route-warning">
-          ⚠️ Rute tidak tersedia
+          ⚠️ ${escapeHtml(nearest.routeError || 'Rute tidak tersedia')}
         </span>
       `;
 
@@ -1981,7 +1993,7 @@ function renderNearest(nearest) {
     routeDurationHtml =
       `
         <span class="route-warning">
-          ⚠️ Tidak tersedia
+          ⚠️ Perhitungan waktu gagal
         </span>
       `;
 
@@ -2109,129 +2121,105 @@ function renderNearest(nearest) {
 
 async function getRouteInfo(point) {
 
+  if (!currentLocation || !point) return;
+
+  // Pastikan koordinat valid sebelum dikirim ke server routing.
+  const originLon = Number(point.lon);
+  const originLat = Number(point.lat);
+  const destinationLon = Number(currentLocation.lon);
+  const destinationLat = Number(currentLocation.lat);
+
   if (
-    !currentLocation ||
-    !point
+    !validLatLon(originLat, originLon) ||
+    !validLatLon(destinationLat, destinationLon)
   ) {
-
+    point.routeDistance = null;
+    point.routeDuration = null;
+    point.routeGeometry = null;
+    point.routeStatus = 'error';
+    point.routeError = 'Koordinat kantor atau customer tidak valid.';
+    renderNearest(point);
+    drawMapRoute(point);
     return;
-
   }
 
-
-  point.routeStatus =
-    'loading';
-
-
+  point.routeStatus = 'loading';
+  point.routeError = '';
   renderNearest(point);
 
+  const coordinates = `${originLon},${originLat};${destinationLon},${destinationLat}`;
+  let lastError = null;
 
-  try {
+  // Coba server utama, lalu server cadangan jika layanan pertama gagal.
+  for (const server of OSRM_SERVERS) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    /*
-      OSRM menggunakan:
-      longitude,latitude
-    */
+    try {
+      const requestUrl = new URL(`${server}/${coordinates}`);
+      requestUrl.searchParams.set('overview', 'full');
+      requestUrl.searchParams.set('geometries', 'geojson');
 
-    const origin =
-      `${point.lon},${point.lat}`;
+      const response = await fetch(requestUrl.toString(), {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
 
+      const responseText = await response.text();
+      let data;
 
-    const destination =
-      `${currentLocation.lon},${currentLocation.lat}`;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Respons server bukan JSON (HTTP ${response.status}).`);
+      }
 
+      if (!response.ok) {
+        throw new Error(data.message || `Routing server HTTP ${response.status}`);
+      }
 
-    const url =
-      `${OSRM_URL}/${origin};${destination}` +
-      `?overview=full&geometries=geojson`;
+      if (data.code !== 'Ok' || !Array.isArray(data.routes) || !data.routes.length) {
+        throw new Error(data.message || data.code || 'Rute kendaraan tidak ditemukan.');
+      }
 
+      const route = data.routes[0];
+      if (!Number.isFinite(route.distance) || !Number.isFinite(route.duration)) {
+        throw new Error('Data jarak atau waktu dari server tidak valid.');
+      }
 
-    const response =
-      await fetch(
-        url,
-        {
-          method: 'GET',
-          cache: 'no-store'
-        }
-      );
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        `Routing server HTTP ${response.status}`
-      );
-
-    }
-
-
-    const data =
-      await response.json();
-
-
-    if (
-      data.code !== 'Ok' ||
-      !data.routes ||
-      !data.routes.length
-    ) {
-
-      throw new Error(
-        'Rute kendaraan tidak ditemukan.'
-      );
-
-    }
-
-
-    const route =
-      data.routes[0];
-
-
-    point.routeDistance =
-      route.distance;
-
-
-    point.routeDuration =
-      route.duration;
-
-    point.routeGeometry =
-      route.geometry && route.geometry.coordinates
+      point.routeDistance = route.distance;
+      point.routeDuration = route.duration;
+      point.routeGeometry = route.geometry && Array.isArray(route.geometry.coordinates)
         ? route.geometry.coordinates
         : null;
+      point.routeStatus = 'success';
+      point.routeError = '';
 
-    point.routeStatus =
-      'success';
+      renderNearest(point);
+      drawMapRoute(point);
+      return;
 
-    renderNearest(point);
-    drawMapRoute(point);
-
+    } catch (error) {
+      lastError = error;
+      console.warn('Routing gagal pada server:', server, error);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  catch (error) {
+  point.routeDistance = null;
+  point.routeDuration = null;
+  point.routeGeometry = null;
+  point.routeStatus = 'error';
+  point.routeError = lastError && lastError.name === 'AbortError'
+    ? 'Server rute terlalu lama merespons (timeout 15 detik).'
+    : (lastError?.message || 'Layanan rute tidak dapat dihubungi.');
 
-    console.error(
-      'OSRM routing gagal:',
-      error
-    );
-
-
-    point.routeDistance =
-      null;
-
-
-    point.routeDuration =
-      null;
-    point.routeGeometry = null;
-
-    point.routeStatus =
-      'error';
-
-    renderNearest(point);
-    drawMapRoute(point);
-
-  }
-
+  renderNearest(point);
+  drawMapRoute(point);
 }
-
 
 /* =========================================================
    PETA LEAFLET + MARKER CLUSTER
@@ -2271,6 +2259,9 @@ function initKibMap() {
   });
   kibMap.addLayer(officeMarkerLayer);
 
+  // Layer khusus lingkaran radius kantor terdekat dan labelnya.
+  radiusLayer = L.featureGroup().addTo(kibMap);
+
   setTimeout(() => kibMap.invalidateSize(), 150);
 }
 
@@ -2304,6 +2295,7 @@ function updateMapLocationAndNearest(nearest) {
 
   if (nearestMarker) kibMap.removeLayer(nearestMarker);
   if (customerMarker) kibMap.removeLayer(customerMarker);
+  if (radiusLayer) radiusLayer.clearLayers();
 
   if (nearest) {
     nearestMarker = L.marker([nearest.lat, nearest.lon], {
@@ -2311,6 +2303,32 @@ function updateMapLocationAndNearest(nearest) {
       zIndexOffset: 900
     }).addTo(kibMap);
     nearestMarker.bindPopup(`<b>⭐ KANTOR TERDEKAT</b><br>${escapeHtml(nearest.name)}<br>Jarak garis lurus: ${formatDistance(nearest.distance)}`);
+
+    // Gambar radius 30 km dari kantor KIB terdekat.
+    const radiusCircle = L.circle([nearest.lat, nearest.lon], {
+      radius: OFFICE_RADIUS_KM * 1000,
+      color: '#0d6efd',
+      weight: 3,
+      opacity: 0.9,
+      fillColor: '#0d6efd',
+      fillOpacity: 0.12
+    }).addTo(radiusLayer);
+
+    radiusCircle.bindPopup(`<b>JANGKAUAN KANTOR KIB</b><br>${escapeHtml(nearest.name)}<br>Radius: ${OFFICE_RADIUS_KM} km`);
+
+    // Label ditaruh di sisi utara lingkaran agar tulisan radius terlihat di peta.
+    const labelLat = nearest.lat + (OFFICE_RADIUS_KM / 111.32);
+    L.marker([labelLat, nearest.lon], {
+      interactive: false,
+      keyboard: false,
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="radius-label">RADIUS ${OFFICE_RADIUS_KM} KM</div>`,
+        iconSize: [110, 26],
+        iconAnchor: [55, 13]
+      }),
+      zIndexOffset: 700
+    }).addTo(radiusLayer);
   }
 
   if (currentLocation) {
@@ -2321,13 +2339,15 @@ function updateMapLocationAndNearest(nearest) {
     customerMarker.bindPopup(`<b>📍 LOKASI CUSTOMER</b><br>${currentLocation.lat.toFixed(6)}, ${currentLocation.lon.toFixed(6)}`);
   }
 
+  // Pastikan lingkaran 30 km dan lokasi customer sama-sama terlihat.
   if (nearest && currentLocation) {
-    const bounds = L.latLngBounds(
-      [nearest.lat, nearest.lon],
-      [currentLocation.lat, currentLocation.lon]
-    );
-    kibMap.fitBounds(bounds.pad(0.25), { maxZoom: 14 });
+    const bounds = L.latLngBounds(radiusLayer.getBounds());
+    bounds.extend([currentLocation.lat, currentLocation.lon]);
+    kibMap.fitBounds(bounds.pad(0.08), { maxZoom: 12 });
+  } else if (nearest && radiusLayer.getBounds().isValid()) {
+    kibMap.fitBounds(radiusLayer.getBounds().pad(0.08), { maxZoom: 12 });
   }
+
   setTimeout(() => kibMap.invalidateSize(), 100);
 }
 
@@ -2351,7 +2371,10 @@ function drawMapRoute(point) {
 
   routeLine.bindPopup(`<b>Rute Kantor → Customer</b><br>${formatRouteDistance(point.routeDistance)} · ${formatDuration(point.routeDuration)}`);
   const bounds = routeLine.getBounds();
-  if (bounds.isValid()) kibMap.fitBounds(bounds.pad(0.18), { maxZoom: 15 });
+  if (radiusLayer && radiusLayer.getBounds().isValid()) {
+    bounds.extend(radiusLayer.getBounds());
+  }
+  if (bounds.isValid()) kibMap.fitBounds(bounds.pad(0.08), { maxZoom: 12 });
 }
 
 
